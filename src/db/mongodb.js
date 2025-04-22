@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 // URL de conexión
-const MONGO_URL = process.env.MONGO_URL || 'mongodb://admin:password@localhost:27017/whatsapp-bot?authSource=admin';
+const MONGO_URL = process.env.MONGO_URL;
 
 // Esquema para los mensajes
 const messageSchema = new mongoose.Schema({

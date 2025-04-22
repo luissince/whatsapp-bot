@@ -1,4 +1,6 @@
 // src/index.js - Punto de entrada principal
+require('dotenv').config();
+
 const { WhatsAppService } = require('./src/services/whatsapp.service.js');
 const { ExpressServer } = require('./src/server/express.server.js');
 const { SocketManager } = require('./src/services/socket.service.js');
@@ -6,7 +8,6 @@ const { MessageHandler } = require('./src/handlers/message.handler.js');
 const { ConfigService } = require('./src/config/config.service.js');
 const { connectToMongoDB } = require('./src/db/mongodb');
 
-require('dotenv').config();
 
 async function bootstrap() {
   try {
