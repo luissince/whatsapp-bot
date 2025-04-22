@@ -11,6 +11,11 @@ services:
     volumes:
       - mongodb_data:/data/db
     restart: unless-stopped
+  whatsapp-bot:
+    build: .
+    container_name: whatsapp-bot
+    ports:
+      - "80:80"
 
 volumes:
   mongodb_data:

@@ -664,10 +664,10 @@ class MessageHandler {
         await this.whatsAppService.sendTextMessage(sender, mensajeFueraContexto, originalMessage);
         await this._guardarHistorial(sender, 'assistant', mensajeFueraContexto);
 
-        // // Mostrar menú para redirigir la conversación
-        // setTimeout(async () => {
-        //   await this._mostrarMenuInicial(sender, originalMessage);
-        // }, 1000);
+        // Mostrar menú para redirigir la conversación
+        setTimeout(async () => {
+          await this._mostrarMenuInicial(sender, originalMessage);
+        }, 1000);
         return;
       }
 
