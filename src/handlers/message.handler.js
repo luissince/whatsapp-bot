@@ -594,89 +594,154 @@ class MessageHandler {
       const numeroSeleccionado = this._detectarSeleccionNumerica(cleanText);
       const etapaActual = usuario.etapaConversacion || 'inicial';
 
-      // CASO ESPECIAL: Si está esperando selección de un producto por número
-      if (usuario.esperandoSeleccionProducto && numeroSeleccionado !== null) {
-        const ok = await this._processSpecialCase(numeroSeleccionado, sender, originalMessage);
-        if (ok) return;
+      if (process.env.TYPE === "business") {
+        await this._processBusinessMessaage(cleanText, usuario, etapaActual, numeroSeleccionado, sender, originalMessage);
+      } else {
+        await this._processPersonalMessage(cleanText, sender, originalMessage);
       }
 
-      // CASO INICIAL: Si es un nuevo usuario o es un saludo
-      if (etapaActual === 'inicial' || this._detectarSaludo(cleanText)) {
-        await this._processInitialCase(sender, originalMessage, originalMessage);
-        return;
-      }
-
-      // CASO MENU: Si el usuario responde al menú inicial con una opción numérica
-      if (etapaActual === 'menu_inicial' && numeroSeleccionado !== null) {
-        await this._processSelectMenuCase(numeroSeleccionado, sender, originalMessage);
-        return;
-      }
-
-      // CASO OPCIONES DESPUÉS DE PRODUCTO: Si el usuario responde después de ver un producto
-      if (etapaActual === 'mostrando_producto' && numeroSeleccionado !== null) {
-        this._processSelectProductCase(numeroSeleccionado, sender, originalMessage);
-        return;
-      }
-
-      // CASO PETICIÓN DE CATÁLOGO: El usuario pide o acepta ver el catálogo
-      const pideCatalogo = this._detectarPeticionCatalogo(cleanText);
-      const aceptaCatalogo = this._detectarAceptacionCatalogo(cleanText);
-      const esperandoRespuestaCatalogo = usuario.esperandoRespuestaCatalogo;
-
-      if (pideCatalogo || (esperandoRespuestaCatalogo && aceptaCatalogo)) {
-        await this._enviarCatalogo(sender, originalMessage);
-        return;
-      }
-
-      // CASO ESPERANDO BÚSQUEDA: El usuario está buscando un producto específico
-      if (etapaActual === 'esperando_busqueda' || this._detectarIntencionCompra(cleanText)) {
-        this._processSearchProductCase(cleanText, sender, originalMessage);
-        return;
-      }
-
-      // CASO NUEVA BÚSQUEDA: El usuario quiere buscar algo nuevo
-      if (this._detectarBusquedaNueva(cleanText)) {
-        await this.whatsAppService.sendTextMessage(
-          sender,
-          "¡Claro! ¿Qué producto te gustaría buscar ahora? Por favor, indícame el nombre o tipo de producto que te interesa.",
-          originalMessage
-        );
-        await this._guardarHistorial(sender, 'assistant', "¡Claro! ¿Qué producto te gustaría buscar ahora? Por favor, indícame el nombre o tipo de producto que te interesa.");
-        await this._actualizarUsuario(sender, { etapaConversacion: 'esperando_busqueda' });
-        return;
-      }
-
-      // CASO MOSTRAR MENÚ: El usuario quiere ver opciones o menú
-      if (cleanText.toLowerCase().includes("menu") ||
-        cleanText.toLowerCase().includes("menú") ||
-        cleanText.toLowerCase().includes("opciones") ||
-        cleanText.toLowerCase().includes("ayuda")) {
-        await this._mostrarMenuInicial(sender, originalMessage);
-        return;
-      }
-
-      // CASO DEFAULT: Procesamiento con AI para otros mensajes
-      // Verificar primero si el tema está relacionado con el negocio
-      const esTemaNegocio = this._detectarTemaNegocio(cleanText);
-
-      if (!esTemaNegocio) {
-        const mensajeFueraContexto = "Disculpa, solo puedo ayudarte con temas relacionados a nuestros productos y servicios. ¿Hay algo específico sobre nuestros productos que te gustaría saber? Puedo mostrarte el catálogo o buscar un producto específico para ti.";
-        await this.whatsAppService.sendTextMessage(sender, mensajeFueraContexto, originalMessage);
-        await this._guardarHistorial(sender, 'assistant', mensajeFueraContexto);
-
-        // Mostrar menú para redirigir la conversación
-        setTimeout(async () => {
-          await this._mostrarMenuInicial(sender, originalMessage);
-        }, 1000);
-        return;
-      }
-
-      // Procesar con IA para casos no cubiertos, pero relacionados con el negocio
-      await this._processIA(sender, etapaActual, originalMessage);
     } catch (error) {
       console.error("Error en processMessage:", error);
       await this.whatsAppService.sendTextMessage(sender, "Lo siento, tuve un problema técnico. ¿Podrías intentarlo nuevamente?", originalMessage);
     }
+  }
+
+  async _processBusinessMessaage(cleanText, usuario, etapaActual, numeroSeleccionado, sender, originalMessage) {
+    // CASO ESPECIAL: Si está esperando selección de un producto por número
+    if (usuario.esperandoSeleccionProducto && numeroSeleccionado !== null) {
+      const ok = await this._processSpecialCase(numeroSeleccionado, sender, originalMessage);
+      if (ok) return;
+    }
+
+    // CASO INICIAL: Si es un nuevo usuario o es un saludo
+    if (etapaActual === 'inicial' || this._detectarSaludo(cleanText)) {
+      await this._processInitialCase(sender, originalMessage, originalMessage);
+      return;
+    }
+
+    // CASO MENU: Si el usuario responde al menú inicial con una opción numérica
+    if (etapaActual === 'menu_inicial' && numeroSeleccionado !== null) {
+      await this._processSelectMenuCase(numeroSeleccionado, sender, originalMessage);
+      return;
+    }
+
+    // CASO OPCIONES DESPUÉS DE PRODUCTO: Si el usuario responde después de ver un producto
+    if (etapaActual === 'mostrando_producto' && numeroSeleccionado !== null) {
+      this._processSelectProductCase(numeroSeleccionado, sender, originalMessage);
+      return;
+    }
+
+    // CASO PETICIÓN DE CATÁLOGO: El usuario pide o acepta ver el catálogo
+    const pideCatalogo = this._detectarPeticionCatalogo(cleanText);
+    const aceptaCatalogo = this._detectarAceptacionCatalogo(cleanText);
+    const esperandoRespuestaCatalogo = usuario.esperandoRespuestaCatalogo;
+
+    if (pideCatalogo || (esperandoRespuestaCatalogo && aceptaCatalogo)) {
+      await this._enviarCatalogo(sender, originalMessage);
+      return;
+    }
+
+    // CASO ESPERANDO BÚSQUEDA: El usuario está buscando un producto específico
+    if (etapaActual === 'esperando_busqueda' || this._detectarIntencionCompra(cleanText)) {
+      this._processSearchProductCase(cleanText, sender, originalMessage);
+      return;
+    }
+
+    // CASO NUEVA BÚSQUEDA: El usuario quiere buscar algo nuevo
+    if (this._detectarBusquedaNueva(cleanText)) {
+      await this.whatsAppService.sendTextMessage(
+        sender,
+        "¡Claro! ¿Qué producto te gustaría buscar ahora? Por favor, indícame el nombre o tipo de producto que te interesa.",
+        originalMessage
+      );
+      await this._guardarHistorial(sender, 'assistant', "¡Claro! ¿Qué producto te gustaría buscar ahora? Por favor, indícame el nombre o tipo de producto que te interesa.");
+      await this._actualizarUsuario(sender, { etapaConversacion: 'esperando_busqueda' });
+      return;
+    }
+
+    // CASO MOSTRAR MENÚ: El usuario quiere ver opciones o menú
+    if (cleanText.toLowerCase().includes("menu") ||
+      cleanText.toLowerCase().includes("menú") ||
+      cleanText.toLowerCase().includes("opciones") ||
+      cleanText.toLowerCase().includes("ayuda")) {
+      await this._mostrarMenuInicial(sender, originalMessage);
+      return;
+    }
+
+    // CASO DEFAULT: Procesamiento con AI para otros mensajes
+    // Verificar primero si el tema está relacionado con el negocio
+    const esTemaNegocio = this._detectarTemaNegocio(cleanText);
+
+    if (!esTemaNegocio) {
+      const mensajeFueraContexto = "Disculpa, solo puedo ayudarte con temas relacionados a nuestros productos y servicios. ¿Hay algo específico sobre nuestros productos que te gustaría saber? Puedo mostrarte el catálogo o buscar un producto específico para ti.";
+      await this.whatsAppService.sendTextMessage(sender, mensajeFueraContexto, originalMessage);
+      await this._guardarHistorial(sender, 'assistant', mensajeFueraContexto);
+
+      // Mostrar menú para redirigir la conversación
+      setTimeout(async () => {
+        await this._mostrarMenuInicial(sender, originalMessage);
+      }, 1000);
+      return;
+    }
+
+    // Procesar con IA para casos no cubiertos, pero relacionados con el negocio
+    await this._processIA(cleanText, sender, etapaActual, originalMessage);
+  }
+
+  async _processPersonalMessage(cleanText, sender, originalMessage) {
+    // Process with OpenAI using a different system prompt for personal/professional context
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const systemPrompt = `
+      Eres un asistente personal para un profesional en ingeniería.
+      Responde preguntas sobre su trayectoria profesional, habilidades, proyectos y experiencia en ingeniería.
+
+      Información clave sobre el profesional:
+      Nombre: Luis Alexander (aAnderls)
+
+      Profesión: Ingeniero de Sistemas
+
+      Experiencia: 5 años
+
+      Habilidades principales: Programación, Bases de Datos, Redes, Seguridad y Computación en la Nube
+
+      Intereses personales:
+      Además de ser un apasionado de la tecnología, Luis tiene una vida llena de pequeñas grandes pasiones: le encanta hornear panes artesanales (en especial bomboloni y brioche), correr al aire libre y cuidar con amor a sus pollitos, que viven felices en un lugar verde y comen mejor que muchos humanos.
+
+      Promueve una vida sostenible, evita el uso de plásticos siempre que puede y siente verdadera curiosidad por el mundo de las ventas. En sus ratos libres, desarrolla videojuegos, donde combina su lado lógico con el creativo.
+
+      Y, por supuesto, no se puede hablar de Luis sin mencionar su amor por el café (y la leche con café). Las mañanas sin eso simplemente no son mañanas.
+
+      Estilo de interacción:
+      Aunque el enfoque es profesional, Luis también es cercano y auténtico. Si le hacen preguntas demasiado personales o fuera de lugar, responderá con humor de adulto, ironía suave y ese toque relajado que da la experiencia (y quizá un poco de pan casero en el horno).
+
+      Mantén las respuestas claras, confiables y con un toque humano. Si el tema se sale del ámbito profesional, responde con simpatía y, cuando sea necesario, redirige con elegancia hacia lo que realmente importa… aunque siempre con buena onda.
+    `;
+
+    const historialUsuario = await this._obtenerHistorial(sender);
+    const mensajesHistorial = historialUsuario.map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...mensajesHistorial,
+        { role: "user", content: cleanText }
+      ],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+
+    const respuestaAI = completion.choices[0].message.content;
+
+    // Save bot response to history
+    await this._guardarHistorial(sender, 'assistant', respuestaAI);
+
+    // Send text response
+    await this.whatsAppService.sendTextMessage(sender, respuestaAI, originalMessage);
   }
 
   async _processInitialCase(sender, originalMessage) {
@@ -879,7 +944,7 @@ class MessageHandler {
     return false;
   }
 
-  async _processIA(sender, etapaActual, originalMessage) {
+  async _processIA(cleanText, sender, etapaActual, originalMessage) {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     // Obtener historial para dar contexto a la AI

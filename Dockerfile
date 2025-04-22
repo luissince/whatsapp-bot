@@ -16,16 +16,25 @@ COPY . .
 # Establecer la imagen base para la etapa de producción
 FROM node:20-alpine AS production
 
+# Argumentos para personalizar UID/GID (coincidir con host)
+ARG UID=1000
+ARG GID=1000
+
 # Establecer el directorio de trabajo en /app
 WORKDIR /app
 
+# Crear usuario y grupo con UID/GID específicos y asegurar permisos
+RUN apk add --no-cache shadow && \
+    deluser --remove-home node && \
+    addgroup -S -g $GID nodegroup && \
+    adduser -S -u $UID -G nodegroup node && \
+    mkdir -p /app/logs /app/session_auth_info && \
+    chown -R node:nodegroup /app
+
 # Copiar los archivos desde la etapa de construcción (builder) al directorio de trabajo
-COPY --chown=node:node --from=builder /app .
+COPY --chown=node:nodegroup --from=builder /app .
 
-# Crear el directorio de logs y dar permisos
-RUN mkdir logs && chown -R node:node logs
-
-# Cambiar al usuario no privilegiado (node) por razones de seguridad
+# Cambiar al usuario no privilegiado
 USER node
 
 # Exponer el puerto 80 para la aplicación
