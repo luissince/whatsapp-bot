@@ -16,6 +16,11 @@ services:
     container_name: whatsapp-bot
     ports:
       - "80:80"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./session_auth_info:/app/session_auth_info
+    restart: unless-stopped
 
 volumes:
   mongodb_data:
