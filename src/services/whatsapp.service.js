@@ -48,16 +48,6 @@ class WhatsAppService {
       this._setupConnectionHandlers(saveCreds);
       this._setupMessageHandlers();
 
-      this.sock.ev.on('messaging-history.set', ({
-        chats: newChats,
-        contacts: newContacts,
-        messages: newMessages,
-        syncType
-      }) => {
-        console.log('New messages:', newMessages);
-        // handle the chats, contacts and messages
-      })
-
       return true;
     } catch (error) {
       console.error("Error connecting to WhatsApp:", error);
@@ -104,7 +94,11 @@ class WhatsAppService {
         } else if (reason === DisconnectReason.timedOut) {
           console.log("Se agotó el tiempo de conexión, conectando...");
           this.connect();
-        } else {
+        } else if (reason === 503) {
+          console.log("La conexión se perdió porque el servidor no está disponible, reconectando...");
+          this.connect();
+        }
+        else {
           this.sock.end(
             `Motivo de desconexión desconocido: ${reason}|${lastDisconnect.error}`
           );
@@ -165,40 +159,38 @@ class WhatsAppService {
     }
   }
 
-  // Añade esta función a tu clase WhatsAppService existente
+  async sendDocumentMessage(to, url, quoted = null, filename = "documento.pdf", caption = "") {
+    try {
+      // Descarga el documento desde la URL
+      const response = await axios({
+        method: 'GET',
+        url: url,
+        responseType: 'arraybuffer',
+      });
 
-async sendDocumentMessage(to, url, quoted = null, filename = "documento.pdf", caption = "") {
-  try {
-    // Descarga el documento desde la URL
-    const response = await axios({
-      method: 'GET',
-      url: url,
-      responseType: 'arraybuffer',
-    });
-    
-    const buffer = Buffer.from(response.data, "utf-8");
-    
-    // Envía el documento
-    await this.sock.sendMessage(
-      to,
-      {
-        document: buffer,
-        mimetype: 'application/pdf',
-        fileName: filename,
-        caption: caption
-      },
-      {
-        quoted: quoted ? quoted : undefined
-      }
-    );
-    
-    console.log(`Documento enviado a ${to}`);
-    return true;
-  } catch (error) {
-    console.error(`Error al enviar documento: ${error.message}`);
-    throw error;
+      const buffer = Buffer.from(response.data, "utf-8");
+
+      // Envía el documento
+      await this.sock.sendMessage(
+        to,
+        {
+          document: buffer,
+          mimetype: 'application/pdf',
+          fileName: filename,
+          caption: caption
+        },
+        {
+          quoted: quoted ? quoted : undefined
+        }
+      );
+
+      console.log(`Documento enviado a ${to}`);
+      return true;
+    } catch (error) {
+      console.error(`Error al enviar documento: ${error.message}`);
+      throw error;
+    }
   }
-}
 
   async checkNumberExists(number) {
     try {
