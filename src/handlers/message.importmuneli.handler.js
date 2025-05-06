@@ -12,25 +12,50 @@ class MessageImportmuneliHandler {
     async loadProduct() {
         try {
             const response = await fetch(`${process.env.API_REST_URL}/api/producto/filter/web/id?codigo=TOL001`);
-            if (!response.ok){
-                throw new Error("Error al cargar producto");
-            }
+            if (!response.ok) throw new Error("Error al cargar producto");
+            
             this.jsonProduct = await response.json();
             console.log('Producto cargado correctamente');
+            
+            // Datos de respaldo en caso de error en propiedades
+            this.jsonProduct = {
+                ...this.jsonProduct,
+                nombre: this.jsonProduct.nombre || "Toldo Plegable 3x3",
+                precio: this.jsonProduct.precio || 210,
+                colores: this.jsonProduct.colores || [
+                    {nombre: "Rojo", hexadecimal: "#f00f0f"},
+                    {nombre: "Azul", hexadecimal: "#0e4295"}
+                ],
+                detalles: this.jsonProduct.detalles || [
+                    {nombre: "Ancho", valor: "3m"},
+                    {nombre: "Alto", valor: "3m"},
+                    {nombre: "Largo", valor: "3m"}
+                ],
+                descripcionLarga: this.jsonProduct.descripcionLarga || "Descripción genérica del producto",
+                imagenes: this.jsonProduct.imagenes || []
+            };
         } catch (error) {
             console.error('Error al cargar producto:', error);
-            // Puedes cargar un JSON por defecto en caso de error
-            this.jsonProduct = null;
+            // Datos mínimos para que el bot funcione
+            this.jsonProduct = {
+                nombre: "Toldo Plegable 3x3",
+                precio: 210,
+                colores: [
+                    {nombre: "Rojo", hexadecimal: "#f00f0f"},
+                    {nombre: "Azul", hexadecimal: "#0e4295"}
+                ],
+                detalles: [
+                    {nombre: "Ancho", valor: "3m"},
+                    {nombre: "Alto", valor: "3m"},
+                    {nombre: "Largo", valor: "3m"}
+                ],
+                descripcionLarga: "Toldo plegable de 3x3 metros con estructura metálica y tela resistente.",
+                imagenes: []
+            };
         }
     }
 
     async handleProcess(cleanText, usuario, etapaActual, numeroSeleccionado, sender, originalMessage) {
-        // // CASO ESPECIAL: Si está esperando selección de un producto por número
-        // if (usuario.esperandoSeleccionProducto && numeroSeleccionado !== null) {
-        //     const ok = await this._processSpecialCase(numeroSeleccionado, sender, originalMessage);
-        //     if (ok) return;
-        // }
-
         // Si es la primera interacción o un saludo, mostrar mensaje inicial
         if (etapaActual === 'inicial' || this._detectarSaludo(cleanText)) {
             await this._mostrarMensajeInicialToldo(sender, originalMessage);
@@ -83,8 +108,6 @@ class MessageImportmuneliHandler {
     }
 
     async _mostrarMensajeInicialToldo(sender, originalMessage) {
-        console.log("inicial")
-        console.log(this.jsonProduct)
         const mensajeInicial = `¡Hola! 👋 ¿Interesado en nuestro *${this.jsonProduct.nombre}*? 🏕️\n\n` +
             `📦 *Precio:* S/${this.jsonProduct.precio} (envío incluido)\n` +
             `🎨 *Colores:* ${this.jsonProduct.colores.map(c => c.nombre).join(" | ")}\n` +
@@ -96,16 +119,6 @@ class MessageImportmuneliHandler {
             `>>> *4* - Envíos a provincia\n` +
             `>>> *5* - Otra consulta`;
 
-        // const mensajeInicial = `¡Hola! 👋 ¿Interesado en nuestro *Toldo Plegable 3x3*? 🏕️\n\n` +
-        //     `📦 *Precio:* S/210 (envío incluido)\n` +
-        //     `🔴 *Colores:* Rojo | 🔵 Azul\n\n` +
-        //     `👇 *Elige una opción:*\n` +
-        //     `>>> *1* - Ver detalles\n` +
-        //     `>>> *2* - Hacer pedido\n` +
-        //     `>>> *3* - Métodos de pago\n` +
-        //     `>>> *4* - Envíos a provincia\n` +
-        //     `>>> *5* - Otra consulta`;
-
         await this.whatsAppService.sendTextMessage(sender, mensajeInicial, originalMessage);
         await this.messageHandler.saveHistory(sender, 'assistant', mensajeInicial);
         await this.messageHandler.updateUser(sender, {
@@ -113,16 +126,17 @@ class MessageImportmuneliHandler {
             ofrecidoCatalogo: true,
             esperandoRespuestaCatalogo: false,
             esperandoSeleccionProducto: false,
-            productoActual: 'toldo_plegable_3x3'
+            productoActual: 'toldo_plegable_3x3',
+            viendoImagenes: false
         });
 
-        // Después de 60 segundos, mostrar mensaje de cierre de venta si no ha habido respuesta
+        // Después de 90 segundos, mostrar mensaje de cierre de venta si no ha habido respuesta
         setTimeout(async () => {
             const usuario = await this.messageHandler.getUser(sender);
-            if (usuario.etapaConversacion === 'menu_toldo') {
+            if (usuario.etapaConversacion === 'menu_toldo' && !usuario.viendoImagenes) {
                 await this._mostrarCierreDeVenta(sender, originalMessage);
             }
-        }, 60000);
+        }, 90000);
     }
 
     _obtenerDimensiones() {
@@ -135,7 +149,11 @@ class MessageImportmuneliHandler {
 
     async _procesarOpcionMenuToldo(opcion, sender, originalMessage) {
         switch (opcion) {
-            case 1: // Quiero saber más
+            case 1: // Ver detalles
+                await this.messageHandler.updateUser(sender, {
+                    viendoImagenes: true
+                });
+
                 const detallesTecnicos = this.jsonProduct.detalles
                     .filter(d => !['Ancho', 'Alto', 'Largo'].includes(d.nombre))
                     .map(d => `✔️ *${d.nombre}:* ${d.valor}`)
@@ -144,95 +162,104 @@ class MessageImportmuneliHandler {
                 const mensajeDetalles = `¡Claro! 😄 Nuestro *${this.jsonProduct.nombre}* tiene:\n\n` +
                     `${detallesTecnicos}\n\n` +
                     `📝 *Descripción:* ${this.jsonProduct.descripcionLarga}\n\n` +
-                    `¿Te gustaría ver fotos del producto? 📸 (Escribe "fotos")`;
+                    `⏳ *Estoy preparando las imágenes...* Un momento por favor.`;
 
                 await this.whatsAppService.sendTextMessage(sender, mensajeDetalles, originalMessage);
+                
+                // Enviar mensaje de "cargando"
+                const mensajeCargando = await this._mostrarEstadoProcesamiento(
+                    sender, 
+                    "Cargando imágenes del producto", 
+                    originalMessage
+                );
 
-                // Enviar imágenes del producto desde el JSON
-                for (const img of this.jsonProduct.imagenes.slice(0, 3)) {
-                    await this.whatsAppService.sendImageMessage(sender, img.nombre, originalMessage);
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Pequeño delay entre imágenes
+                try {
+                    // Enviar imágenes del producto
+                    for (const [index, img] of this.jsonProduct.imagenes.slice(0, 3).entries()) {
+                        await this.whatsAppService.sendImageMessage(sender, img.nombre, originalMessage);
+                        if (index < 2) { // Pequeño delay entre imágenes excepto la última
+                            await new Promise(resolve => setTimeout(resolve, 1500));
+                        }
+                    }
+                    
+                    // Eliminar mensaje de "cargando"
+                    await this.whatsAppService.deleteMessage(sender, mensajeCargando.id);
+                    
+                    // Mensaje posterior a imágenes
+                    await this.whatsAppService.sendTextMessage(
+                        sender,
+                        "¿Te gustaría más información o deseas proceder con tu pedido?",
+                        originalMessage
+                    );
+                    
+                } catch (error) {
+                    console.error("Error al enviar imágenes:", error);
+                    await this.whatsAppService.sendTextMessage(
+                        sender,
+                        "⚠️ Ocurrió un error al cargar las imágenes. ¿Deseas intentarlo de nuevo o prefieres continuar con tu pedido?",
+                        originalMessage
+                    );
                 }
 
-            //             const mensajeDetalles = `¡Claro! 😄 Nuestro *Toldo Plegable 3x3* tiene las siguientes características:
+                await this.messageHandler.updateUser(sender, {
+                    viendoImagenes: false,
+                    etapaConversacion: 'menu_toldo'
+                });
+                break;
 
-            //   ✔️ Estructura metálica reforzada
-            //   ✔️ Tela Oxford impermeable, ¡mucho más resistente que el poliéster!
-            //   ✔️ Fácil de armar y desarmar
-            //   ✔️ Ideal para ferias, jardines, terrazas o eventos
-            //   ✔️ Incluye su funda para transporte
-
-            //   ¿Te gustaría ver fotos o videos del producto real? 📸`;
-
-            //             await this.whatsAppService.sendTextMessage(sender, mensajeDetalles, originalMessage);
-            //             await this.messageHandler.saveHistory(sender, 'assistant', mensajeDetalles);
-
-            //             // Enviar algunas imágenes del producto
-            //             try {
-            //                 // Aquí se enviarían las imágenes del producto usando URLs predefinidas
-            //                 const imageUrl = `${process.env.API_REST_URL}/images/toldo_plegable.jpg`;
-            //                 await this.whatsAppService.sendImageMessage(sender, imageUrl, originalMessage);
-            //             } catch (imgError) {
-            //                 console.error("Error al enviar imagen:", imgError.message);
-            //             }
-
-            //             // Después de enviar detalles, mostrar el cierre de venta
-            //             setTimeout(async () => {
-            //                 await this._mostrarCierreDeVenta(sender, originalMessage);
-            //             }, 5000);
-            //             break;
-
-            case 2: // Cómo hacer pedido
-                const mensajePedido = `¡Súper fácil! 😎 Solo necesito que me brindes estos datos para coordinar tu envío:
-      
-      📍 Ciudad y distrito
-      🎨 Color: 🔴 Rojo o 🔵 Azul
-      📦 ¿Deseas envío a domicilio o recoger en agencia?
-      
-      Una vez confirmes, coordinamos tu pedido. El proceso de pago es muy seguro 👇`;
+            case 2: // Hacer pedido
+                const mensajePedido = `¡Súper fácil! 😎 Solo necesito que me brindes estos datos para coordinar tu envío:\n\n` +
+                    `📍 Ciudad y distrito\n` +
+                    `🎨 Color: ${this.jsonProduct.colores.map(c => c.nombre).join(" o ")}\n` +
+                    `📦 ¿Deseas envío a domicilio o recoger en agencia?\n\n` +
+                    `Una vez confirmes, coordinamos tu pedido. El proceso de pago es muy seguro 👇`;
 
                 await this.whatsAppService.sendTextMessage(sender, mensajePedido, originalMessage);
                 await this.messageHandler.saveHistory(sender, 'assistant', mensajePedido);
-                await this.messageHandler.updateUser(sender, { etapaConversacion: 'consulta_color' });
+                await this.messageHandler.updateUser(sender, { 
+                    etapaConversacion: 'consulta_color',
+                    viendoImagenes: false 
+                });
                 break;
 
             case 3: // Métodos de pago
-                const mensajePago = `Claro, aquí te explico según tu ubicación:
-      
-      📍 *Lima Metropolitana:*
-      ➡️ Pago *contra entrega*. Solo pagas cuando recibes el producto.
-      
-      📍 *Provincia:*
-      ➡️ Solo pedimos un adelanto mínimo de *S/10* 💰
-      El resto lo pagas al recibirlo en tu ciudad.
-      ✅ Enviamos por *agencias como Shalom* o la que prefieras.
-      🎥 Puedes pedir fotos, videos o videollamada como prueba del envío.
-      
-      Este método nos ayuda a evitar fraudes de ambas partes 🤝`;
+                const mensajePago = `Claro, aquí te explico según tu ubicación:\n\n` +
+                    `📍 *Lima Metropolitana:*\n` +
+                    `➡️ Pago *contra entrega*. Solo pagas cuando recibes el producto.\n\n` +
+                    `📍 *Provincia:*\n` +
+                    `➡️ Solo pedimos un adelanto mínimo de *S/10* 💰\n` +
+                    `El resto lo pagas al recibirlo en tu ciudad.\n` +
+                    `✅ Enviamos por *agencias como Shalom* o la que prefieras.\n` +
+                    `🎥 Puedes pedir fotos, videos o videollamada como prueba del envío.\n\n` +
+                    `Este método nos ayuda a evitar fraudes de ambas partes 🤝`;
 
                 await this.whatsAppService.sendTextMessage(sender, mensajePago, originalMessage);
                 await this.messageHandler.saveHistory(sender, 'assistant', mensajePago);
 
                 // Mostrar cierre de venta después de explicar los métodos de pago
                 setTimeout(async () => {
-                    await this._mostrarCierreDeVenta(sender, originalMessage);
+                    const usuario = await this.messageHandler.getUser(sender);
+                    if (usuario.etapaConversacion === 'menu_toldo') {
+                        await this._mostrarCierreDeVenta(sender, originalMessage);
+                    }
                 }, 5000);
                 break;
 
             case 4: // Envíos a provincia
-                const mensajeEnvio = `¡Sí, claro! 🚛 Enviamos a TODO el Perú desde Lima.
-      
-      📦 Por lo general usamos *Shalom*, pero podemos enviar por otra agencia si lo prefieres.
-      💸 El costo del envío lo cobra directamente la agencia (aprox. *S/18 a S/25*).
-      📆 Los envíos se hacen todos los días a las *6:00 p.m.*
-      
-      ✨ Al enviar, te compartimos la guía y pruebas del despacho.`;
+                const mensajeEnvio = `¡Sí, claro! 🚛 Enviamos a TODO el Perú desde Lima.\n\n` +
+                    `📦 Por lo general usamos *Shalom*, pero podemos enviar por otra agencia si lo prefieres.\n` +
+                    `💸 El costo del envío lo cobra directamente la agencia (aprox. *S/18 a S/25*).\n` +
+                    `📆 Los envíos se hacen todos los días a las *6:00 p.m.*\n\n` +
+                    `✨ Al enviar, te compartimos la guía y pruebas del despacho.`;
 
                 await this.whatsAppService.sendTextMessage(sender, mensajeEnvio, originalMessage);
                 await this.messageHandler.saveHistory(sender, 'assistant', mensajeEnvio);
 
                 setTimeout(async () => {
-                    await this._mostrarCierreDeVenta(sender, originalMessage);
+                    const usuario = await this.messageHandler.getUser(sender);
+                    if (usuario.etapaConversacion === 'menu_toldo') {
+                        await this._mostrarCierreDeVenta(sender, originalMessage);
+                    }
                 }, 5000);
                 break;
 
@@ -247,7 +274,6 @@ class MessageImportmuneliHandler {
                 await this._mostrarMensajeInicialToldo(sender, originalMessage);
         }
     }
-
 
     async _procesarSeleccionColor(texto, sender, originalMessage) {
         const coloresDisponibles = this.jsonProduct.colores;
@@ -278,7 +304,8 @@ class MessageImportmuneliHandler {
             await this.whatsAppService.sendTextMessage(sender, mensajeConfirmacion, originalMessage);
             await this.messageHandler.updateUser(sender, {
                 etapaConversacion: 'consulta_envio',
-                colorSeleccionado: colorSeleccionado.nombre
+                colorSeleccionado: colorSeleccionado.nombre,
+                viendoImagenes: false
             });
         } else {
             const opcionesColores = coloresDisponibles.map(c => `🔘 *${c.nombre}* (${c.hexadecimal})`).join("\n");
@@ -288,35 +315,6 @@ class MessageImportmuneliHandler {
                 originalMessage
             );
         }
-
-        //         let colorSeleccionado = "";
-        //         if (texto.toLowerCase().includes("rojo")) {
-        //             colorSeleccionado = "Rojo";
-        //         } else if (texto.toLowerCase().includes("azul")) {
-        //             colorSeleccionado = "Azul";
-        //         }
-
-        //         if (colorSeleccionado) {
-        //             const mensajeConfirmacion = `¡Excelente elección! Has seleccionado el color *${colorSeleccionado}* para tu toldo plegable.
-
-        //   Ahora necesito saber:
-        //   📍 ¿En qué ciudad y distrito te encuentras?
-        //   📦 ¿Prefieres envío a domicilio o recoger en agencia?`;
-
-        //             await this.whatsAppService.sendTextMessage(sender, mensajeConfirmacion, originalMessage);
-        //             await this.messageHandler.saveHistory(sender, 'assistant', mensajeConfirmacion);
-        //             await this.messageHandler.updateUser(sender, {
-        //                 etapaConversacion: 'consulta_envio',
-        //                 colorSeleccionado: colorSeleccionado
-        //             });
-        //         } else {
-        //             await this.whatsAppService.sendTextMessage(
-        //                 sender,
-        //                 "Por favor, indícame si prefieres el toldo en color 🔴 *Rojo* o 🔵 *Azul*.",
-        //                 originalMessage
-        //             );
-        //             await this.messageHandler.saveHistory(sender, 'assistant', "Por favor, indícame si prefieres el toldo en color 🔴 *Rojo* o 🔵 *Azul*.");
-        //         }
     }
 
     async _procesarOpcionEnvio(texto, sender, originalMessage) {
@@ -330,35 +328,33 @@ class MessageImportmuneliHandler {
         const usuario = await this.messageHandler.getUser(sender);
         const colorSeleccionado = usuario.colorSeleccionado || "No especificado";
 
-        const mensajeConfirmacionPedido = `¡Perfecto! Resumen de tu pedido:
-      
-      🛒 *Producto:* Toldo Plegable 3x3
-      🎨 *Color:* ${colorSeleccionado}
-      🚚 *Entrega:* ${tipoEnvio}
-      
-      Para finalizar tu pedido, por favor indícame:
-      📍 Tu dirección exacta con referencias (o la agencia de tu preferencia)
-      📱 Un número de contacto adicional (opcional)
-      
-      Una vez confirmes estos datos, coordinaremos el pago y envío inmediato. 🚀`;
+        const mensajeConfirmacionPedido = `¡Perfecto! Resumen de tu pedido:\n\n` +
+            `🛒 *Producto:* ${this.jsonProduct.nombre}\n` +
+            `🎨 *Color:* ${colorSeleccionado}\n` +
+            `🚚 *Entrega:* ${tipoEnvio}\n\n` +
+            `Para finalizar tu pedido, por favor indícame:\n` +
+            `📍 Tu dirección exacta con referencias (o la agencia de tu preferencia)\n` +
+            `📱 Un número de contacto adicional (opcional)\n\n` +
+            `Una vez confirmes estos datos, coordinaremos el pago y envío inmediato. 🚀`;
 
         await this.whatsAppService.sendTextMessage(sender, mensajeConfirmacionPedido, originalMessage);
         await this.messageHandler.saveHistory(sender, 'assistant', mensajeConfirmacionPedido);
         await this.messageHandler.updateUser(sender, {
             etapaConversacion: 'confirmacion_pedido',
-            tipoEnvio: tipoEnvio
+            tipoEnvio: tipoEnvio,
+            viendoImagenes: false
         });
 
         // Notificar al dueño del interés confirmado
         const mensajeDueño = `
-        📢 *PEDIDO DE TOLDO PLEGABLE*
-        👤 *Cliente:* ${originalMessage.pushName || "Cliente"}
-        📱 *Número:* ${sender.split('@')[0]}
-        🛒 *Producto:* Toldo Plegable 3x3
-        🎨 *Color seleccionado:* ${colorSeleccionado}
-        🚚 *Tipo de entrega:* ${tipoEnvio}
-        ⏰ *Fecha/Hora:* ${new Date().toLocaleString()}
-        `;
+📢 *PEDIDO DE ${this.jsonProduct.nombre.toUpperCase()}*
+👤 *Cliente:* ${originalMessage.pushName || "Cliente"}
+📱 *Número:* ${sender.split('@')[0]}
+🛒 *Producto:* ${this.jsonProduct.nombre}
+🎨 *Color seleccionado:* ${colorSeleccionado}
+🚚 *Tipo de entrega:* ${tipoEnvio}
+⏰ *Fecha/Hora:* ${new Date().toLocaleString()}
+`;
         const numeroDelDueño = `${process.env.OWNER_NUMBER}@c.us`;
         await this.whatsAppService.sendTextMessage(numeroDelDueño, mensajeDueño);
     }
@@ -408,46 +404,25 @@ class MessageImportmuneliHandler {
         }));
 
         const systemPrompt = `
-        Eres un vendedor experto de ${this.jsonProduct.nombre}. Usa esta información para responder:
+Eres un vendedor experto de ${this.jsonProduct.nombre}. Usa esta información para responder:
 
-        *Características principales:*
-        ${this.jsonProduct.descripcionCorta}
+*Características principales:*
+${this.jsonProduct.descripcionCorta}
 
-        *Detalles técnicos:*
-        ${this.jsonProduct.detalles.map(d => `- ${d.nombre}: ${d.valor}`).join('\n')}
+*Detalles técnicos:*
+${this.jsonProduct.detalles.map(d => `- ${d.nombre}: ${d.valor}`).join('\n')}
 
-        *Colores disponibles:*
-        ${this.jsonProduct.colores.map(c => `- ${c.nombre} (${c.hexadecimal})`).join('\n')}
+*Colores disponibles:*
+${this.jsonProduct.colores.map(c => `- ${c.nombre} (${c.hexadecimal})`).join('\n')}
 
-        *Precio:* S/${this.jsonProduct.precio} (envío incluido)
+*Precio:* S/${this.jsonProduct.precio} (envío incluido)
 
-        Enfócate en estos beneficios:
-        1. ${this._obtenerBeneficios()[0]}
-        2. ${this._obtenerBeneficios()[1]}
-        3. ${this._obtenerBeneficios()[2]}
-
-        Sé persuasivo pero no agresivo. Responde de manera concisa (máximo 3 frases).
-        Si preguntan por algo no relacionado, redirige amablemente al producto.
-        `;
-
-        // const systemPrompt = `
-        //       Eres un vendedor entusiasta de Toldos Plegables 3x3. Tu objetivo es vender toldos plegables enfocándote en sus características:
-        //       - Precio: S/210 con envío incluido
-        //       - Colores disponibles: Rojo y Azul
-        //       - Estructura metálica reforzada
-        //       - Tela Oxford impermeable resistente
-        //       - Fácil de armar y desarmar
-        //       - Ideal para ferias, jardines, terrazas o eventos
-        //       - Incluye funda para transporte
-
-        //       Debes ser amable pero también persuasivo y cerrar la venta. Para cualquier consulta que no sea sobre toldos plegables,
-        //       intenta redirigir la conversación hacia el producto. Si el cliente muestra interés, enfatiza:
-        //       1. Stock limitado
-        //       2. Alta demanda
-        //       3. Envío GRATIS con pago contra entrega (en Lima)
-
-        //       Debes mantener respuestas cortas, emotivas y convincentes. No escribas más de 3-4 párrafos.
-        //       `;
+Reglas importantes:
+1. Si el cliente está en medio de un pedido (etapa 'consulta_color' o 'consulta_envio'), NO muestres el menú
+2. Mantén el foco en la conversación actual
+3. Solo muestra el menú si es claramente una nueva consulta
+4. Sé conciso (máximo 3 frases)
+5. Si preguntan por algo no relacionado, redirige amablemente al producto`;
 
         const completion = await client.chat.completions.create({
             model: "gpt-4o",
@@ -461,18 +436,17 @@ class MessageImportmuneliHandler {
         });
 
         const respuestaAI = completion.choices[0].message.content;
-
-        // Guardar respuesta del bot en el historial
         await this.messageHandler.saveHistory(sender, 'assistant', respuestaAI);
-
-        // Enviar respuesta de texto
         await this.whatsAppService.sendTextMessage(sender, respuestaAI, originalMessage);
 
-        // Si es una consulta general no específica, mostrar el menú después de 3 segundos
-        if (!etapaActual.includes('confirmacion')) {
+        // Solo mostrar menú si no está en proceso de pedido y es una consulta general
+        if (!['consulta_color', 'consulta_envio', 'confirmacion_pedido'].includes(etapaActual)) {
             setTimeout(async () => {
-                await this._mostrarMensajeInicialToldo(sender, originalMessage);
-            }, 3000);
+                const usuarioActualizado = await this.messageHandler.getUser(sender);
+                if (usuarioActualizado.etapaConversacion === etapaActual) {
+                    await this._mostrarMensajeInicialToldo(sender, originalMessage);
+                }
+            }, 5000);
         }
     }
 
@@ -511,18 +485,17 @@ class MessageImportmuneliHandler {
                 originalMessage
             );
         }
-        //     const mensajeCierre = `📢 ¡Aprovecha HOY! 🕐
-
-        //   *Stock limitado y alta demanda*
-        //   🚛 ¡Envío GRATIS con pago contra entrega en Lima!
-
-        //   📲 ¿Te gustaría apartar el tuyo ahora mismo?`;
-
-        //     await this.whatsAppService.sendTextMessage(sender, mensajeCierre, originalMessage);
-        //     await this.messageHandler.saveHistory(sender, 'assistant', mensajeCierre);
     }
 
-    // Método para detectar palabras clave relacionadas con el toldo
+    async _mostrarEstadoProcesamiento(sender, mensaje, originalMessage) {
+        const mensajeEstado = await this.whatsAppService.sendTextMessage(
+            sender, 
+            `⏳ ${mensaje}...`, 
+            originalMessage
+        );
+        return mensajeEstado; // Para poder eliminarlo después
+    }
+
     _detectarConsultaToldo(texto) {
         const patrones = [
             /toldo/i,
@@ -557,7 +530,6 @@ class MessageImportmuneliHandler {
 
         return patrones.some((p) => p.test(texto));
     }
-
 }
 
 module.exports = MessageImportmuneliHandler;
