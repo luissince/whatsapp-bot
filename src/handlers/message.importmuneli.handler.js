@@ -11,7 +11,10 @@ class MessageImportmuneliHandler {
 
     async loadProduct() {
         try {
-            const response = await fetch(`${process.env.API_REST_URL}}/api/producto/filter/web/id?codigo=TOL001`);
+            const response = await fetch(`${process.env.API_REST_URL}/api/producto/filter/web/id?codigo=TOL001`);
+            if (!response.ok){
+                throw new Error("Error al cargar producto");
+            }
             this.jsonProduct = await response.json();
             console.log('Producto cargado correctamente');
         } catch (error) {
@@ -80,6 +83,8 @@ class MessageImportmuneliHandler {
     }
 
     async _mostrarMensajeInicialToldo(sender, originalMessage) {
+        console.log("inicial")
+        console.log(this.jsonProduct)
         const mensajeInicial = `¡Hola! 👋 ¿Interesado en nuestro *${this.jsonProduct.nombre}*? 🏕️\n\n` +
             `📦 *Precio:* S/${this.jsonProduct.precio} (envío incluido)\n` +
             `🎨 *Colores:* ${this.jsonProduct.colores.map(c => c.nombre).join(" | ")}\n` +
