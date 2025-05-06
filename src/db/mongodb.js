@@ -57,7 +57,12 @@ const userSchema = new mongoose.Schema({
       'mostrando_producto',
       'informacion_envios',
       'esperando_vendedor',
-      'conversando'
+      'conversando',
+
+      'menu_toldo',
+      'consulta_color',
+      'consulta_envio',
+      'confirmacion_pedido',
     ],
     default: 'inicial'
   },

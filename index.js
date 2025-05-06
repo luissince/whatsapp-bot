@@ -4,9 +4,12 @@ require('dotenv').config();
 const { WhatsAppService } = require('./src/services/whatsapp.service.js');
 const { ExpressServer } = require('./src/server/express.server.js');
 const { SocketManager } = require('./src/services/socket.service.js');
-const { MessageHandler } = require('./src/handlers/message.handler.js');
 const { ConfigService } = require('./src/config/config.service.js');
 const { connectToMongoDB } = require('./src/db/mongodb');
+const MessageHandler = require('./src/handlers/message.handler.js');
+const MessageHandlerBusiness = require('./src/handlers/message.business.handle.js');
+const MessageHandlerImportmuneli = require('./src/handlers/message.importmuneli.handler.js');
+const MessageHandlerPersonal = require('./src/handlers/message.personal.handle.js');
 
 
 async function bootstrap() {
@@ -33,6 +36,13 @@ async function bootstrap() {
 
     // Inicializar manejador de mensajes
     const messageHandler = new MessageHandler(whatsAppService);
+    const messageHandlerBusiness = new MessageHandlerBusiness(whatsAppService, messageHandler);
+    const messageHandlerImportmuneli = new MessageHandlerImportmuneli(whatsAppService, messageHandler);
+    const messageHandlerPersonal = new MessageHandlerPersonal(whatsAppService, messageHandler);
+
+    messageHandler.handleMessageBusiness(messageHandlerBusiness);
+    messageHandler.handleMessageImportmuneli(messageHandlerImportmuneli);
+    messageHandler.handleMessagePersonal(messageHandlerPersonal);
 
     // Configurar manejadores de eventos
     whatsAppService.setMessageHandler(messageHandler.handleIncomingMessage.bind(messageHandler));
