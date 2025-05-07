@@ -1,3 +1,4 @@
+const OpenAI = require('openai');
 const { Message, User } = require('../db/mongodb');
 
 class MessageHandler {
@@ -88,7 +89,7 @@ class MessageHandler {
       const usuario = await this.getUser(sender);
 
       // 3. Verificar si el mensaje es una selección numérica de un producto
-      const numeroSeleccionado = this._detectarSeleccionNumerica(cleanText);
+      const numeroSeleccionado = await this._detectarSeleccionNumerica(cleanText);
       const etapaActual = usuario.etapaConversacion || 'inicial';
 
       if (process.env.TYPE === "business") {
@@ -197,20 +198,61 @@ class MessageHandler {
   }
 
   // Identifica cuando el usuario selecciona una opción numérica
-  _detectarSeleccionNumerica(texto) {
-    // Buscar patrones como "1", "2.", "opción 3", "elegir 4", etc.
+  async _detectarSeleccionNumerica(texto) {
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const systemPrompt = `
+  Eres un asistente que solo debe identificar si el texto del usuario contiene una selección numérica.
+  Puede estar escrita como número (por ejemplo: 1, 2) o como palabra (por ejemplo: uno, dos).
+  Devuelve únicamente el número como entero (sin texto adicional). 
+  Si no hay ningún número que indique una elección clara, devuelve "null" (como cadena exacta).
+  No expliques tu razonamiento ni devuelvas otra cosa que el número o "null".
+  `;
+
+    try {
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: texto }
+        ],
+        max_tokens: 10,
+        temperature: 0,
+      });
+
+      const respuesta = completion.choices[0].message.content?.trim();
+
+      if (respuesta === 'null') return null;
+
+      const numero = parseInt(respuesta, 10);
+      if (!isNaN(numero)) return numero;
+    } catch (error) {
+      console.error('Error al llamar a la API de OpenAI:', error);
+    }
+
+    // Fallback local si la API falla o la respuesta es inválida
+    const textoLimpio = texto.trim().toLowerCase();
+
+    const palabrasANumeros = {
+      uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5,
+      seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+    };
+
+    for (const [palabra, valor] of Object.entries(palabrasANumeros)) {
+      if (textoLimpio.includes(palabra)) return valor;
+    }
+
     const patrones = [
-      /^(\d+)$/i,                   // Solo un número
-      /^(\d+)[.)]/i,                // Número seguido de punto o paréntesis
-      /^(opción|opcion|elegir|seleccionar|selección|seleccion|quiero|me interesa|ver|número|numero)\s+(\d+)/i, // Palabra clave + número
-      /^(el|la|el producto|la opción|opción|opcion)\s+(\d+)/i,  // Artículo + número
+      /^(\d+)$/,
+      /^(\d+)[.)]/,
+      /(opción|elegir|seleccionar|ver|número|numero)\s+(\d+)/i,
+      /(producto|opción)\s+(\d+)/i,
     ];
 
     for (const patron of patrones) {
-      const match = texto.trim().match(patron);
+      const match = texto.match(patron);
       if (match) {
-        // Extraer el número, que puede estar en diferentes grupos según el patrón
-        const numero = parseInt(match[1].match(/\d+/) ? match[1] : match[2]);
+        const numero = parseInt(match[1] || match[2]);
         if (!isNaN(numero)) return numero;
       }
     }

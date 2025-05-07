@@ -443,11 +443,11 @@ class MessageBusinessHandle {
         const mensajeMenu = `
     ¡Hola! 👋 Soy el asistente de la tienda. ¿En qué puedo ayudarte hoy?
 
-    1️⃣ Ver catálogo completo 📚
-    2️⃣ Buscar un producto específico 🔍
-    3️⃣ Consultar disponibilidad 📦
-    4️⃣ Información de envíos 🚚
-    5️⃣ Contactar con un vendedor 👨‍💼
+    1️⃣ - Ver catálogo completo 📚
+    2️⃣ - Buscar un producto específico 🔍
+    3️⃣ - Consultar disponibilidad 📦
+    4️⃣ - Información de envíos 🚚
+    5️⃣ - Contactar con un vendedor 👨‍💼
 
     Puedes elegir una opción escribiendo el número o hacerme cualquier pregunta directamente.`;
 

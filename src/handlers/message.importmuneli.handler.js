@@ -57,10 +57,10 @@ class MessageImportmuneliHandler {
         }
 
         // Detectar palabras clave para redirigir a las opciones principales
-        if (this._detectarConsultaToldo(cleanText)) {
-            await this._redirigirConsultaToldo(cleanText, sender, originalMessage);
-            return;
-        }
+        // if (this._detectarConsultaToldo(cleanText)) {
+        //     await this._redirigirConsultaToldo(cleanText, sender, originalMessage);
+        //     return;
+        // }
 
         // Si llegamos a este punto, es una consulta general - usar IA
         await this._processIAToldo(cleanText, sender, etapaActual, originalMessage);
@@ -83,18 +83,16 @@ class MessageImportmuneliHandler {
     }
 
     async _mostrarMensajeInicialToldo(sender, originalMessage) {
-        console.log("inicial")
-        console.log(this.jsonProduct)
-        const mensajeInicial = `¡Hola! 👋 ¿Interesado en nuestro *${this.jsonProduct.nombre}*? 🏕️\n\n` +
+        const mensajeInicial = `¡Hola! 👋 Soy tu asistente virtual ¿Interesado en nuestro *${this.jsonProduct.nombre}*? 🏕️\n\n` +
             `📦 *Precio:* S/${this.jsonProduct.precio} (envío incluido)\n` +
             `🎨 *Colores:* ${this.jsonProduct.colores.map(c => c.nombre).join(" | ")}\n` +
             `📏 *Dimensiones:* ${this._obtenerDimensiones()}\n\n` +
             `👇 *Elige una opción:*\n` +
-            `>>> *1* - Ver detalles completos\n` +
-            `>>> *2* - Hacer pedido\n` +
-            `>>> *3* - Métodos de pago\n` +
-            `>>> *4* - Envíos a provincia\n` +
-            `>>> *5* - Otra consulta`;
+            `>>> 1️⃣ - Ver detalles completos\n` +
+            `>>> 2️⃣ - Hacer pedido\n` +
+            `>>> 3️⃣ - Métodos de pago\n` +
+            `>>> 4️⃣ - Envíos a provincia\n` +
+            `>>> 5️⃣ - Otra consulta`;
 
         // const mensajeInicial = `¡Hola! 👋 ¿Interesado en nuestro *Toldo Plegable 3x3*? 🏕️\n\n` +
         //     `📦 *Precio:* S/210 (envío incluido)\n` +
@@ -116,13 +114,13 @@ class MessageImportmuneliHandler {
             productoActual: 'toldo_plegable_3x3'
         });
 
-        // Después de 60 segundos, mostrar mensaje de cierre de venta si no ha habido respuesta
-        setTimeout(async () => {
-            const usuario = await this.messageHandler.getUser(sender);
-            if (usuario.etapaConversacion === 'menu_toldo') {
-                await this._mostrarCierreDeVenta(sender, originalMessage);
-            }
-        }, 60000);
+        // // Después de 60 segundos, mostrar mensaje de cierre de venta si no ha habido respuesta
+        // setTimeout(async () => {
+        //     const usuario = await this.messageHandler.getUser(sender);
+        //     if (usuario.etapaConversacion === 'menu_toldo') {
+        //         await this._mostrarCierreDeVenta(sender, originalMessage);
+        //     }
+        // }, 60000);
     }
 
     _obtenerDimensiones() {
@@ -143,15 +141,13 @@ class MessageImportmuneliHandler {
 
                 const mensajeDetalles = `¡Claro! 😄 Nuestro *${this.jsonProduct.nombre}* tiene:\n\n` +
                     `${detallesTecnicos}\n\n` +
-                    `📝 *Descripción:* ${this.jsonProduct.descripcionLarga}\n\n` +
-                    `¿Te gustaría ver fotos del producto? 📸 (Escribe "fotos")`;
+                    `📝 *Descripción:* ${this.jsonProduct.descripcionLarga}\n`;
 
                 await this.whatsAppService.sendTextMessage(sender, mensajeDetalles, originalMessage);
 
                 // Enviar imágenes del producto desde el JSON
                 for (const img of this.jsonProduct.imagenes.slice(0, 3)) {
                     await this.whatsAppService.sendImageMessage(sender, img.nombre, originalMessage);
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Pequeño delay entre imágenes
                 }
 
             //             const mensajeDetalles = `¡Claro! 😄 Nuestro *Toldo Plegable 3x3* tiene las siguientes características:
@@ -213,10 +209,6 @@ class MessageImportmuneliHandler {
                 await this.whatsAppService.sendTextMessage(sender, mensajePago, originalMessage);
                 await this.messageHandler.saveHistory(sender, 'assistant', mensajePago);
 
-                // Mostrar cierre de venta después de explicar los métodos de pago
-                setTimeout(async () => {
-                    await this._mostrarCierreDeVenta(sender, originalMessage);
-                }, 5000);
                 break;
 
             case 4: // Envíos a provincia
@@ -231,9 +223,6 @@ class MessageImportmuneliHandler {
                 await this.whatsAppService.sendTextMessage(sender, mensajeEnvio, originalMessage);
                 await this.messageHandler.saveHistory(sender, 'assistant', mensajeEnvio);
 
-                setTimeout(async () => {
-                    await this._mostrarCierreDeVenta(sender, originalMessage);
-                }, 5000);
                 break;
 
             case 5: // Otra consulta
@@ -468,12 +457,12 @@ class MessageImportmuneliHandler {
         // Enviar respuesta de texto
         await this.whatsAppService.sendTextMessage(sender, respuestaAI, originalMessage);
 
-        // Si es una consulta general no específica, mostrar el menú después de 3 segundos
-        if (!etapaActual.includes('confirmacion')) {
-            setTimeout(async () => {
-                await this._mostrarMensajeInicialToldo(sender, originalMessage);
-            }, 3000);
-        }
+        // // Si es una consulta general no específica, mostrar el menú después de 3 segundos
+        // if (!etapaActual.includes('confirmacion')) {
+        //     setTimeout(async () => {
+        //         await this._mostrarMensajeInicialToldo(sender, originalMessage);
+        //     }, 3000);
+        // }
     }
 
     _obtenerBeneficios() {
