@@ -1,5 +1,6 @@
 // db/mongodb.js
 const mongoose = require('mongoose');
+const { string } = require('sharp/lib/is');
 
 // URL de conexión
 const MONGO_URL = process.env.MONGO_URL;
@@ -63,6 +64,7 @@ const userSchema = new mongoose.Schema({
       'consulta_color',
       'consulta_envio',
       'confirmacion_pedido',
+      'confirmacion_pago',
     ],
     default: 'inicial'
   },
@@ -82,13 +84,17 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  colorSeleccionado: {
+    type: String,
+    default: null
+  },
   ultimaBusqueda: {
     termino: String,
     timestamp: {
       type: Date,
       default: null
     }
-  }
+  },
 });
 
 // Esquema para productos
@@ -146,10 +152,32 @@ const productSchema = new mongoose.Schema({
   }
 });
 
+// Esquema para pedido
+const pedidoSchema = new mongoose.Schema({
+  whatsappId: { type: String, required: true, index: true },
+  colorSeleccionado: string,
+  tipoEnvio: string,
+  direccion: string,
+  pagoAdelanto: {
+    type: Object,
+  },
+  estado: {
+    type: String,
+    enum: ['pendiente', 'pagado', 'pago_recibido'],
+    default: 'pendiente'
+  },
+  fecha: {
+    type: Date,
+    default: Date.now
+  },
+  numero: string
+});
+
 // Crear modelos
 const Message = mongoose.model('Message', messageSchema);
 const User = mongoose.model('User', userSchema);
 const Product = mongoose.model('Product', productSchema);
+const Order = mongoose.model('Pedido', pedidoSchema);
 
 // Función para conectar a MongoDB
 async function connectToMongoDB() {
@@ -168,5 +196,6 @@ module.exports = {
   Message,
   User,
   Product,
+  Order,
   mongoose
 };

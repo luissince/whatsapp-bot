@@ -1,5 +1,5 @@
 const OpenAI = require('openai');
-const { Message, User } = require('../db/mongodb');
+const { Message, User, Order } = require('../db/mongodb');
 
 class MessageHandler {
   constructor(whatsAppService) {
@@ -54,8 +54,13 @@ class MessageHandler {
         return;
       }
       // Si el mensaje es una imagen o video, procesar con su texto si existe
-      else if (message.message?.imageMessage || message.message?.videoMessage) {
-        const mediaType = message.message?.imageMessage ? "imagen" : "video";
+      else if (message.message?.imageMessage) {
+        await this._processMessagePayment(message, numberWa);
+        return;
+      }
+
+      else if ( message.message?.videoMessage) {
+        const mediaType = "video";
         const caption = message.message?.imageMessage?.caption || message.message?.videoMessage?.caption || `¡Gracias por tu ${mediaType}!`;
 
         if (caption && caption.trim() !== "") {
@@ -95,7 +100,6 @@ class MessageHandler {
       if (process.env.TYPE === "business") {
         await this.messageHandlerBusiness.handleProcess(cleanText, usuario, etapaActual, numeroSeleccionado, sender, originalMessage);
       } else if (process.env.TYPE === "only") {
-        console.log("Ejecutando mensaje de importmuneli");
         await this.messageHandlerImportmuneli.handleProcess(cleanText, usuario, etapaActual, numeroSeleccionado, sender, originalMessage);
       } else {
         await this.messageHandlerPersonal.handleProcess(cleanText, sender, originalMessage);
@@ -104,6 +108,31 @@ class MessageHandler {
     } catch (error) {
       console.error("Error en processMessage:", error);
       await this.whatsAppService.sendTextMessage(sender, "Lo siento, tuve un problema técnico. ¿Podrías intentarlo nuevamente?", originalMessage);
+    }
+  }
+
+  async _processMessagePayment(message, sender) {
+    try {
+
+      if (process.env.TYPE === "business") {
+        await this.whatsAppService.sendTextMessage(sender, "En estos momentos no procesar imagenes", message);
+      } else if (process.env.TYPE === "only") {
+
+        const captureMessage = "Danos unos segundos para procesar tu imagen...";
+
+        await this.saveHistory(sender, 'assistant', captureMessage);
+
+        await this.whatsAppService.sendTextMessage(sender, captureMessage, message);
+
+        await this.messageHandlerImportmuneli.handleProcessPayment(sender, message);
+
+      } else {
+        await this.whatsAppService.sendTextMessage(sender, "En estos momentos no procesar imagenes", message);
+      }
+
+    } catch (error) {
+      console.error("Error en _processMessagePayment:", error);
+      await this.whatsAppService.sendTextMessage(sender, "Lo siento, tuve un problema técnico. ¿Podrías intentarlo nuevamente?", message);
     }
   }
 
@@ -154,6 +183,17 @@ class MessageHandler {
     }
   }
 
+  async deleteHistory(sender) {
+    try {
+      const result = await Message.deleteMany({ whatsappId: sender });
+      console.log(`✅ Historial eliminado: ${result.deletedCount} mensajes`);
+      return true;
+    } catch (error) {
+      console.error('❌ Error al eliminar historial de MongoDB:', error);
+      return false;
+    }
+  }
+
   async getUser(sender) {
     try {
       let usuario = await User.findOne({ whatsappId: sender });
@@ -194,6 +234,52 @@ class MessageHandler {
       console.log(`✅ Usuario actualizado en MongoDB: ${sender}`);
     } catch (error) {
       console.error('❌ Error al actualizar usuario en MongoDB:', error);
+    }
+  }
+
+  async deleteUser(sender) {
+    try {
+      const result = await User.deleteOne({ whatsappId: sender });
+      console.log(`✅ Usuario eliminado: ${result.deletedCount}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Error al eliminar la orden de MongoDB:', error);
+      return false;
+    }
+  }
+
+  async saveOrder(sender, datos) {
+    try {
+      await Order.findOneAndUpdate(
+        { whatsappId: sender },
+        { $set: datos },
+        { upsert: true }
+      );
+      console.log(`✅ Orden guardado en MongoDB: ${sender}`);
+    } catch (error) {
+      console.error('❌ Error al guardar la orden en MongoDB:', error);
+    }
+  }
+
+  async getOrder(sender) {
+    try {
+      let order = await Order.findOne({ whatsappId: sender });
+
+      return order;
+    } catch (error) {
+      console.error('❌ Error al obtener la orden de MongoDB:', error);
+      return {};
+    }
+  }
+
+  async deleteOrder(sender) {
+    try {
+      const result = await Order.deleteOne({ whatsappId: sender });
+      console.log(`✅ Orden eliminada: ${result.deletedCount} documento`);
+      return true;
+    } catch (error) {
+      console.error('❌ Error al eliminar la orden de MongoDB:', error);
+      return false;
     }
   }
 

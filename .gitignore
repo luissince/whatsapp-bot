@@ -7,6 +7,8 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+src/path/certificates
+
 node_modules
 session_auth_info
 dist
