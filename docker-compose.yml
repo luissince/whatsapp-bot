@@ -20,6 +20,7 @@ services:
       - NODE_ENV=production
     volumes:
       - ./session_auth_info:/app/session_auth_info
+      - ./debug_media:/app/debug_media
     restart: unless-stopped
 
 volumes:
