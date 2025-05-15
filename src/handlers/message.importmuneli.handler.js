@@ -169,7 +169,7 @@ class MessageImportmuneliHandler {
         - Dirección: ${existingOrder?.direccion || "No proporcionada"}
         - Pago adelantado: ${existingOrder?.pagoAdelanto || "No proporcionado"}
 
-        🎯 *Tu objetivo:* Ayuda al cliente a completar su pedido usando un lenguaje sencillo y amigable. Sé proactivo/a, resume si es necesario y guía hacia el siguiente paso. Siempre termina con una pregunta o indicación clara.
+        🎯 *Tu objetivo:* Tu objetivo es ofrecer toda la información desde el inicio de conversación simpre brindar toda la información que necesitas para ayudar al cliente. Sé proactivo/a, resume si es necesario y guía hacia el siguiente paso. Siempre termina con una pregunta o indicación clara.
 
         ### Reglas del sistema (NO mostrar al cliente):
         1. Cuando el cliente selecciona o menciona un color, extrae esa información y devuelve al final de tu respuesta: COLOR_SELECCIONADO: [color]
